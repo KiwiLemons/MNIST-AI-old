@@ -8,7 +8,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Main {
 
@@ -20,7 +22,9 @@ public class Main {
     static int hiddenlayer = 70;
     static double eta = 3; // Learning Rate
     static int epochs = 1;
-    static double MiniBatchSize = 10.0;
+    static int BatchNumInt = 10;
+    static double BatchNumDub = (double)BatchNumInt;
+    static Map<String, Double> LookupTable = new HashMap<>(255);
     //Contains all inputs and output data, index 0 is inputs, 1 is expected output
     static List<double[][]> Data = new ArrayList<double[][]>();
     static List<List<double[][]>> TrainingData = new ArrayList<List<double[][]>>();
@@ -49,8 +53,9 @@ public class Main {
 
 
     public static void main(String[] args) {
-        
+
         boolean TrainedNetwork = false;
+
         while (true) {
             System.out.println("Type the digit of the option you want:\n" +
                             "[1] Train the network\n" + 
@@ -60,6 +65,7 @@ public class Main {
                             "[5] Run network on testing data showing images and labels\n" + 
                             "[6] Display the misclassified testing images\n" +
                             "[7] Save the network state to a file\n" +
+                            "[8] Save the Network to an image\n" +
                             "[0] Exit");
             String answer = System.console().readLine();
 
@@ -144,6 +150,8 @@ public class Main {
                     SaveNetwork();
                 }
 
+            } else if (answer.equals("8")){
+                System.out.println("Not Implemented Yet!");
             // Bad option
             } else {
                 System.out.println("Not a valid option");
@@ -160,7 +168,7 @@ public class Main {
         for (int epoch = 1; epoch <= epochs; epoch++) 
         {
             System.out.println(String.format("------ Epoch %d ------", epoch));
-            // For each mini-batch
+            // For each Batch
             for (int b = 0; b < TrainingData.size(); b++) 
             {
                 //Zero out Weight and Bias gradients
@@ -175,12 +183,12 @@ public class Main {
 
 
                 var Batch = TrainingData.get(b);
-                // Go through each data-set in Mini-Batch
+                // Go through each data-set in Batch
                 for (int d = 0; d < Batch.size(); d++) 
                 {
                     var Dataset = Batch.get(d);
                     //Propogate the data through the network
-                    propagate(Dataset, b * (int)MiniBatchSize + d);
+                    propagate(Dataset, b * BatchNumInt + d);
 
                     //Back Propagate
                     backPropagate(Dataset);
@@ -199,7 +207,7 @@ public class Main {
                         // Update Weights for each connection for each connection
                         var Node = Weights[node];
                         for (int i = 0; i < Node.length; i++) {
-                            Node[i] = Node[i] - (eta/MiniBatchSize) * WeightGradient[level][node][i];
+                            Node[i] = Node[i] - (eta/BatchNumDub) * WeightGradient[level][node][i];
                             //System.out.print(String.format("%f  ", Node[i]));
                         }
                         //System.out.println();
@@ -209,7 +217,7 @@ public class Main {
                     // For each node update biases
                     //System.out.println(String.format("\nBiases: Layer %d",level+1));
                     for (int node = 0; node < Weights.length; node++){
-                        Biases[node] = Biases[node] - (eta/MiniBatchSize) * SummedBiasGradient[level][node];
+                        Biases[node] = Biases[node] - (eta/BatchNumDub) * SummedBiasGradient[level][node];
                         //System.out.print(String.format("%f  ", Biases[node]));
                     }
                     //System.out.println("\n");
@@ -403,19 +411,23 @@ public class Main {
 
         //Populate the list with each line that has been split into an array for each pixel.
         while (line != null){
-            String[] elements = line.split(",");
-            double[] ScaledInput = new double[elements.length - 1];
-            double[] ExpectedOutput = new double[10];
-
-            //Convert all inputs to doubles and scale them between 0.0 and 1.0
-            for (int i = 0; i < ScaledInput.length; i++) {
-                ScaledInput[i] = Double.parseDouble(elements[i + 1]) / 255.0;
+            // Convert csv to array
+            double[] ScaledInputs = new double[784];
+            int start = 2;
+            int end = 0;
+            int index = 0;
+            while ((end = line.indexOf(",", start)) != -1){
+                ScaledInputs[index] = Integer.parseInt(line.substring(start, end)) / 255.0;
+                start = end + 1;
+                index += 1;
             }
+
             //Create correct output layer array with all zeros except a 1 for the index with the correct answer.
-            int CorrectAnswer = Integer.parseInt(elements[0]);
+            double[] ExpectedOutput = new double[10];
+            int CorrectAnswer = Integer.parseInt(line.substring(0,1));
             ExpectedOutput[CorrectAnswer] = 1;
 
-            double[][] DataElement = {ScaledInput, ExpectedOutput};
+            double[][] DataElement = {ScaledInputs, ExpectedOutput};
             Data.add(DataElement);
 
             //Get next line
@@ -436,11 +448,12 @@ public class Main {
         if (training){
             int i = 0;
             int Datasize = Data.size();
+            int Batchsize = Datasize - BatchNumInt;
 
             //Prioritize mini-batch size
-            while (i <= Datasize - (int)MiniBatchSize){
-                TrainingData.add(Data.subList(i, i + (int)MiniBatchSize));
-                i += (int)MiniBatchSize;
+            while (i <= Batchsize){
+                TrainingData.add(Data.subList(i, i + BatchNumInt));
+                i += BatchNumInt;
             }
             System.out.println(String.format("- Data loaded from file. %d Data sets grouped into %d mini-batches.", Datasize, TrainingData.size()));
         }
