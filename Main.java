@@ -19,7 +19,7 @@ public class Main {
     static int outputs = 10;
     static int hiddenlayer = 70;
     static double eta = 3; // Learning Rate
-    static int epochs = 150;
+    static int epochs = 1;
     static double MiniBatchSize = 10.0;
     //Contains all inputs and output data, index 0 is inputs, 1 is expected output
     static List<double[][]> Data = new ArrayList<double[][]>();
@@ -245,11 +245,12 @@ public class Main {
             var LevelWeights = NetworkWeights[level];
             var LevelBiases = NetworkBiases[level];
             int NodeCount = LevelWeights.length;
+            int X_Inputs_Length = X_Inputs.length;
             double[] LVL_Z_Values = new double[NodeCount];
             double[] LVL_A_Values = new double[NodeCount];
 
             for (int i = 0; i < NodeCount; i++) {
-                for (int j = 0; j < X_Inputs.length; j++) {
+                for (int j = 0; j < X_Inputs_Length; j++) {
                     LVL_Z_Values[i] += X_Inputs[j] * LevelWeights[i][j];
                 }
                 LVL_Z_Values[i] += LevelBiases[i];
@@ -258,18 +259,21 @@ public class Main {
 
             //Update inputs to next level's outputs
             X_Inputs = LVL_A_Values;
+            
             Network_A_Values[level] = LVL_A_Values.clone();
         }
-
-        // Determine if network got the correct answer
+        /////////////////////////////////////////////////
+        // Determine if network got the correct answer //
+        /////////////////////////////////////////////////
         double[] OutputLayerA = Network_A_Values[NetworkBiases.length - 1];
-        // Get max output
+        int OutputLayerA_Length = OutputLayerA.length;
+        
         double NetworkMax = 0;
         double OutputMax = 0;
         int NetworkMaxi = 0;
         int OutputMaxi = 0;
 
-        for (int i = 0; i < OutputLayerA.length; i++) {
+        for (int i = 0; i < OutputLayerA_Length; i++) {
             if (OutputLayerA[i] > NetworkMax){
                 NetworkMax = OutputLayerA[i];
                 NetworkMaxi = i;
@@ -280,7 +284,8 @@ public class Main {
             }
         }
 
-        //Network Answer, Correct Answer, Data index
+        // Save Stats 
+        // Network Answer, Correct Answer, Data index
         int[] info = {NetworkMaxi, OutputMaxi, index};
         //Correct Answer
         if (OutputMaxi == NetworkMaxi){
@@ -297,27 +302,31 @@ public class Main {
         // Iterate through each level starting at the last
         double[][] A_values = {Data[0], Network_A_Values[0], Network_A_Values[1]};
         double[] Y_Outputs = Data[1];
+
+        // For each layer, starting at the last.
         for (int level = NetworkWeights.length - 1; level >= 0; level--) {
             // For each node in the level, Compute the bias and weight gradient.
             //System.out.println(String.format("Level %d Bias Gradient:", level+1));
             // For each node
-            for (int j = 0; j < Network_A_Values[level].length; j++) {
+            int NodeCount = Network_A_Values[level].length;
+            int NextLevel = level + 1;
+            for (int j = 0; j < NodeCount; j++) {
 
                 // For every connection to node, compute the bias gradient
                 // A Value of current node
                 double A_Node = Network_A_Values[level][j];
                 double sum = 0;
                 // If node is an output node, calculate bias based on what outputs should be.
-                if (level == Network_A_Values.length - 1) {
+                if (level == 1) {
                     // Not really a sum just used for same variable to use one equation
                     sum = (A_Node - Y_Outputs[j]);
                 }   
                 // Not an output node
                 else {
-                    double[][] weights = NetworkWeights[level + 1];
+                    int WeightCount = NetworkWeights[NextLevel].length;
                     // For each weight connecting current node to the n ext layer.
-                    for (int k = 0; k < weights.length; k++) {
-                        sum += weights[k][j] * BiasGradient[level + 1][k];
+                    for (int k = 0; k < WeightCount; k++) {
+                        sum += NetworkWeights[NextLevel][k][j] * BiasGradient[level + 1][k];
                     }
                 }
                 // Compute Bias Gradient
@@ -325,26 +334,27 @@ public class Main {
                 SummedBiasGradient[level][j] += sum * A_Node * (1 - A_Node);
 
                 //Compute weight gradient
-                for (int i = 0; i < NetworkWeights[level][j].length; i++) {
+                int WeightCount = NetworkWeights[level][j].length;
+                for (int i = 0; i < WeightCount; i++) {
                     WeightGradient[level][j][i] += A_values[level][i] * BiasGradient[level][j];
                 }
 
             }
             //System.out.println(String.format("\n\nLevel %d Weight Gradient:", level+1));
             // Print Weight Gradient
-            for (int i = 0; i < NetworkWeights[level].length; i++) {
+            /*for (int i = 0; i < NetworkWeights[level].length; i++) {
                 for (int j = 0; j < NetworkWeights[level][i].length; j++) {
-                    //System.out.print(String.format("%f\t", WeightGradient[level][i][j]));
+                    System.out.print(String.format("%f\t", WeightGradient[level][i][j]));
                 }
-                //System.out.println();
+                System.out.println();
             }
-            //System.out.println();
+            System.out.println();*/
         }
     }
 
     public static void RandomizeNetwork(){
         //Randomize weights
-        for (var LevelWeights : NetworkWeights) {
+        for (double[][] LevelWeights : NetworkWeights) {
             for (double[] NodeWeights : LevelWeights) {
                 for (int i = 0; i < NodeWeights.length; i++) {
                     NodeWeights[i] = (Math.random() - 0.5) * Math.random();
@@ -402,8 +412,9 @@ public class Main {
                 ScaledInput[i] = Double.parseDouble(elements[i + 1]) / 255.0;
             }
             //Create correct output layer array with all zeros except a 1 for the index with the correct answer.
-            double CorrectAnswer = Double.parseDouble(elements[0]);
-            ExpectedOutput[((int)CorrectAnswer)] = 1;
+            int CorrectAnswer = Integer.parseInt(elements[0]);
+            ExpectedOutput[CorrectAnswer] = 1;
+
             double[][] DataElement = {ScaledInput, ExpectedOutput};
             Data.add(DataElement);
 
